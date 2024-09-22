@@ -4,19 +4,11 @@
 -export([measure/1]).
 
 calc(N) when is_integer(N) andalso N >= 0 ->
-    Cores = erlang:system_info(schedulers_online),
-    logger:notice("starting ~p workers", [Cores]),
-    start_workers(Cores, Cores, N),
-    recv_parts(Cores, 1);
+    RespondTo = self(),
+    Works = delegate:calc(RespondTo, N),
+    recv_parts(Works, 1);
 calc(_) ->
     {error, badarg}.
-
-start_workers(_Step, 0, _Start) ->
-    ok;
-start_workers(Step, WorkerId, Start) ->
-    RespondTo = self(),
-    spawn(worker, start, [RespondTo, Start, Step]),
-    start_workers(Step, WorkerId - 1, Start - 1).
 
 recv_parts(0, Acc) ->
     Acc;
