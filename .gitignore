@@ -1,0 +1,5 @@
+test/*.beam
+.erlang.mk
+erlang.mk
+ebin
+factorial.d
