@@ -3,6 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 calc_test() ->
+  spawn(delegate ,start, []),
   [?assertEqual(1, factorial:calc(0)),
    ?assertEqual(1, factorial:calc(1)),
    ?assertEqual(2, factorial:calc(2)),

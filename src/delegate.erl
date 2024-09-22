@@ -1,6 +1,18 @@
 -module(delegate).
 
+-export([start/0]).
 -export([calc/2]).
+
+start() ->
+    register(?MODULE, self()),
+    loop().
+
+loop() ->
+    receive
+        {calc, RespondTo, N, NumberOfJobs, WorkersNumber} ->
+            start_workers(RespondTo, NumberOfJobs, WorkersNumber, N),
+            loop()
+    end.
 
 calc(RespondTo, N) ->
     CoresPerNode = erlang:system_info(schedulers_online),
@@ -12,11 +24,12 @@ calc(RespondTo, N) ->
 delegate_to_nodes(_RespondTo, _CoresPerNode, _NumberOfJobs, _N, []) ->
     ok;
 delegate_to_nodes(RespondTo, CoresPerNode, NumberOfJobs, N, [Node | Nodes]) ->
-    start_workers(RespondTo, CoresPerNode, NumberOfJobs, N, Node),
+    logger:notice("delegating ~p with step ~p to ~p", [N, NumberOfJobs, Node]),
+    {?MODULE, Node} ! {calc, RespondTo, N, NumberOfJobs, CoresPerNode},
     delegate_to_nodes(RespondTo, CoresPerNode, NumberOfJobs, N - CoresPerNode, Nodes).
 
-start_workers(_RespondTo, 0, _NumberOfJobs, _Start, _Node) ->
+start_workers(_RespondTo, _NumberOfJobs, 0, _Start) ->
     ok;
-start_workers(RespondTo, WorkerId, NumberOfJobs, Start, Node) ->
-    spawn(Node, worker, start, [RespondTo, Start, NumberOfJobs]),
-    start_workers(RespondTo, WorkerId - 1, NumberOfJobs, Start - 1, Node).
+start_workers(RespondTo, NumberOfJobs, WorkerId, Start) ->
+    spawn(worker, start, [RespondTo, Start, NumberOfJobs]),
+    start_workers(RespondTo, NumberOfJobs, WorkerId - 1, Start - 1).
