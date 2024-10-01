@@ -3,14 +3,20 @@
 -export([calc/2]).
 
 calc(RespondTo, N) ->
-    Cores = erlang:system_info(schedulers_online),
-    Step = Cores,
-    logger:notice("starting ~p workers", [Cores]),
-    start_workers(RespondTo, Cores, Step, N),
-    Cores.
+    CoresPerNode = erlang:system_info(schedulers_online),
+    Nodes = application:get_env(kernel, nodes, [node()]),
+    NumberOfJobs = CoresPerNode * length(Nodes),
+    delegate_to_nodes(RespondTo, CoresPerNode, NumberOfJobs, N, Nodes),
+    NumberOfJobs.
 
-start_workers(_RespondTo, _Step, 0, _Start) ->
+delegate_to_nodes(_RespondTo, _CoresPerNode, _NumberOfJobs, _N, []) ->
     ok;
-start_workers(RespondTo, Step, WorkerId, Start) ->
-    spawn(worker, start, [RespondTo, Start, Step]),
-    start_workers(RespondTo, Step, WorkerId - 1, Start - 1).
+delegate_to_nodes(RespondTo, CoresPerNode, NumberOfJobs, N, [Node | Nodes]) ->
+    start_workers(RespondTo, CoresPerNode, NumberOfJobs, N, Node),
+    delegate_to_nodes(RespondTo, CoresPerNode, NumberOfJobs, N - CoresPerNode, Nodes).
+
+start_workers(_RespondTo, 0, _NumberOfJobs, _Start, _Node) ->
+    ok;
+start_workers(RespondTo, WorkerId, NumberOfJobs, Start, Node) ->
+    spawn(Node, worker, start, [RespondTo, Start, NumberOfJobs]),
+    start_workers(RespondTo, WorkerId - 1, NumberOfJobs, Start - 1, Node).
